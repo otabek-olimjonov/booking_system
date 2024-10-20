@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parking Booking</title>
+    <!-- Updated Bootstrap and styles -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+      /* Updated Container Styling */
+      body,
+      html {
+        height: 100%;
+        margin: 0;
+        font-family: 'Nunito', sans-serif;
+        background-color: #f0f2f5;
+      }
+
+      .container {
+
+        padding: 20px;
+      }
+
+      /* Parking Spot Styling */
+      .parking-spot-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .parking-spot {
+        width: 160px;
+        height: 240px;
+        margin: 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        font-weight: 600;
+        border: 2px solid #ccc;
+        font-size: 18px;
+        text-align: center;
+        padding: 10px;
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        border-radius: 8px;
+      }
+
+      .free {
+        background-color: #d1e7dd;
+        color: #0f5132;
+      }
+
+      .booked {
+        background-color: #ffe8a1;
+        color: #856404;
+      }
+
+      .in-use {
+        background-color: #f8d7da;
+        color: #842029;
+      }
+
+      .parking-spot-container {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        justify-items: center;
+        flex-grow: 1;
+        height: calc(100vh - 200px);
+      }
+
+      .form-switch {
+        margin-top: 10px;
+      }
+
+      .toggle-wrapper {
+        margin-top: 5px;
+      }
+
+      /* Navbar Styling */
+      .navbar {
+        background: #0062cc;
+      }
+
+      .navbar-brand {
+        font-family: 'Poppins', sans-serif;
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: #fff;
+      }
+
+      .nav-link {
+        font-size: 1rem;
+        color: #fff;
+      }
+
+      /* Button Styling */
+      .btn-primary {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+      }
+
+      .btn-danger {
+        background-color: #dc3545;
+        border-color: #dc3545;
+      }
+    </style>
+  </head>
+  <body onload="fetchSpotsStatus()">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">Parking Booking</a>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav me-auto">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                  <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Home</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link active" aria-current="page" href="{% url 'payment' %}">Payment</a>
+                </li>
+              </ul>
+          </ul>
+          <a class="nav-link active" aria-current="page" style="margin-right: 2%;">{{ balance }}</a>
+          
+          <a class="nav-link active" aria-current="page" style="margin-right: 1%;">{{ user.get_full_name }} ({{ user.username }})</a>
+          <form action="{% url 'logout' %}" method="post" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm">Logout</button>
+          </form>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="container text-center">
+        <div class="parking-spot-container" id="parking-spot-container">
+          <!-- Parking spots will be dynamically generated here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Script Logic Remains the Same -->
+    <script>
+      const spots = [
+        {% for spot in parking_spots %}
+        {
+          number: {{ spot.number }},
+          status: '{{ spot.get_status_display|lower }}',
+          booked_by: '{% if spot.booked_by %}{{ spot.booked_by.username }}{% else %}""{% endif %}',
+          in_use_by: '{% if spot.status == "in_use" %}{{ spot.booked_by.username }}{% else %}""{% endif %}',
+          door: {{ spot.door|yesno:"true,false" }}
+        },
+        {% endfor %}
+      ];
+
+      function renderSpots() {
+        const container = document.getElementById('parking-spot-container');
+        container.innerHTML = ''; // Clear the container
+
+        spots.forEach((spot) => {
+          const wrapperDiv = document.createElement('div');
+          wrapperDiv.className = 'parking-spot-wrapper';
+
+          const spotDiv = document.createElement('div');
+          spotDiv.className = `parking-spot ${spot.status}`;
+          spotDiv.innerText = `Spot ${spot.number} - ${spot.status.charAt(0).toUpperCase() + spot.status.slice(1)}`;
+
+          // Handle clicking on the parking spot rectangle
+          spotDiv.addEventListener('click', () => handleSpotClick(spot));
+
+          // Display the user who booked or is using the spot
+          if (spot.booked_by) {
+            const bookedByText = document.createElement('p');
+            bookedByText.innerText = `Booked by: ${spot.booked_by}`;
+            spotDiv.appendChild(bookedByText);
+          }
+          if (spot.in_use_by) {
+            const inUseByText = document.createElement('p');
+            inUseByText.innerText = `In use by: ${spot.in_use_by}`;
+            spotDiv.appendChild(inUseByText);
+          }
+
+          wrapperDiv.appendChild(spotDiv);
+
+          // Add toggle switch for opening/closing the door
+          const toggleDiv = document.createElement('div');
+          toggleDiv.className = 'form-switch toggle-wrapper';
+          const toggleInput = document.createElement('input');
+          toggleInput.className = 'form-check-input';
+          toggleInput.type = 'checkbox';
+          toggleInput.id = `toggle-${spot.number}`;
+          toggleInput.checked = spot.door; // Set initial state based on door status
+
+          const toggleLabel = document.createElement('label');
+          toggleLabel.className = 'form-check-label';
+          toggleLabel.setAttribute('for', `toggle-${spot.number}`);
+          toggleLabel.innerText = 'Door Open';
+
+          toggleDiv.appendChild(toggleInput);
+          toggleDiv.appendChild(toggleLabel);
+          wrapperDiv.appendChild(toggleDiv);
+
+          // Prevent click propagation from toggle to parking spot
+          toggleInput.addEventListener('click', function (event) {
+            event.stopPropagation(); // Prevent the click from reaching the parking spot
+            const isDoorOpen = toggleInput.checked; // Get the current toggle state (checked = open)
+            handleToggleClick(spot.number, isDoorOpen); // Pass the spot number and door state
+          });
+
+          container.appendChild(wrapperDiv);
+        });
+      }
+
+      function fetchSpotsStatus() {
+        fetch('/parking/status/')
+          .then((response) => response.json())
+          .then((data) => {
+            data.parking_spots.forEach((spot) => {
+              const existingSpot = spots.find((s) => s.number === spot.number);
+              if (existingSpot) {
+                existingSpot.status = spot.status;
+                existingSpot.booked_by = spot.booked_by;
+                existingSpot.in_use_by = spot.in_use_by;
+                existingSpot.door = spot.door; // Update door state
+              }
+            });
+            renderSpots();
+          });
+      }
+
+      function handleSpotClick(spot) {
+        let actionUrl = '';
+
+        if (spot.status === 'free') {
+          actionUrl = `/parking/book/${spot.number}/`;
+        }
+        else if (spot.status === 'booked') {
+          actionUrl = `/parking/available/${spot.number}/`;
+        }
+
+        if (actionUrl) {
+          updateSpotStatus(actionUrl);
+        }
+      }
+
+      function handleToggleClick(spotNumber, isDoorOpen) {
+        const actionUrl = `/parking/toggle_door/${spotNumber}/?door_open=${isDoorOpen}`; // Pass door state as a query param
+        updateSpotStatus(actionUrl);
+      }
+
+      function updateSpotStatus(url) {
+        fetch(url, { method: 'POST' })
+          .then((response) => response.json())
+          .then((data) => {
+            console.log('Spot updated successfully');
+            fetchSpotsStatus(); // Refresh the spots
+          });
+      }
+
+      renderSpots();
+      setInterval(fetchSpotsStatus, 5000);
+    </script>
+  </body>
+</html>

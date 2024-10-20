@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  django:
+    build:
+      context: .
+    volumes:
+      - .:/app  # Mount the current directory to /app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: python manage.py runserver 0.0.0.0:8000  # Command to run the Django server
+
+  celery:
+    build:
+      context: .
+    volumes:
+      - .:/app  # Mount the current directory to /app
+    depends_on:
+      - redis
+    command: celery -A booking worker --loglevel=info  # Command to run the Celery worker
+
+  flower:  
+    image: mher/flower
+    restart: always
+    command: celery flower --persistent=True --basic_auth=admin:password
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - FLOWER_PORT=8080
+    ports:  
+      - 8080:8080
+    depends_on:
+      - redis
+
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
